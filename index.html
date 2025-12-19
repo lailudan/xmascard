@@ -1,0 +1,96 @@
+import React, { useRef, useMemo, useState } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { Instances, Instance, OrbitControls, ContactShadows, Environment, Float } from '@react-three/drei'
+import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import * as THREE from 'three'
+
+const COUNT = 7000
+const COLORS = ['#FFB7C5', '#FF69B4', '#FFFFFF', '#D8BFD8']
+
+function Particles({ mode }: { mode: 'TREE' | 'EXPLODE' }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null!)
+  
+  // 初始化粒子目标位置
+  const particles = useMemo(() => {
+    const temp = []
+    for (let i = 0; i < COUNT; i++) {
+      // 树形算法 (圆锥体分布)
+      const t = Math.random()
+      const r = (1 - t) * 5
+      const angle = t * Math.PI * 20
+      const treePos = new THREE.Vector3(Math.cos(angle) * r, t * 15 - 7, Math.sin(angle) * r)
+      
+      // 爆炸算法 (球体随机)
+      const explodePos = new THREE.Vector3().setFromSphericalCoords(
+        15 + Math.random() * 10,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI * 2
+      )
+      
+      temp.push({ treePos, explodePos, speed: 0.05 + Math.random() * 0.05 })
+    }
+    return temp
+  }, [])
+
+  const dummy = new THREE.Object3D()
+
+  useFrame((state) => {
+    const time = state.clock.getElapsedTime()
+    particles.forEach((p, i) => {
+      const target = mode === 'TREE' ? p.treePos : p.explodePos
+      
+      // 使用 Lerp 实现平滑过渡
+      dummy.position.lerp(target, 0.05)
+      
+      // 树在任何状态下保持缓慢自转
+      if (mode === 'TREE') {
+        dummy.rotation.y += 0.01
+      }
+      
+      dummy.updateMatrix()
+      meshRef.current.setMatrixAt(i, dummy.matrix)
+    })
+    meshRef.current.instanceMatrix.needsUpdate = true
+  })
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, COUNT]}>
+      <octahedronGeometry args={[0.15]} />
+      <meshStandardMaterial metalness={0.6} roughness={0.4} />
+    </instancedMesh>
+  )
+}
+
+export default function App() {
+  const [mode, setMode] = useState<'TREE' | 'EXPLODE'>('TREE')
+
+  return (
+    <div className="w-full h-screen bg-[#050103] cursor-pointer" onClick={() => setMode(m => m === 'TREE' ? 'EXPLODE' : 'TREE')}>
+      {/* UI 层 */}
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
+        <h1 className="text-6xl text-pink-200 font-serif mb-4 drop-shadow-[0_0_15px_rgba(255,182,193,0.8)]">
+          DREAMY XMAS
+        </h1>
+        <p className="text-white/50 font-light tracking-widest uppercase text-sm">Click to Bloom • To My Teacher</p>
+      </div>
+
+      {/* 3D 场景 */}
+      <Canvas camera={{ position: [0, 5, 25], fov: 45 }}>
+        <color attach="background" args={['#050103']} />
+        <Environment preset="city" />
+        <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} color="#FF69B4" intensity={2} />
+        
+        <Particles mode={mode} />
+        
+        <ContactShadows position={[0, -8, 0]} opacity={0.4} scale={20} blur={2.5} far={4.5} />
+        
+        <EffectComposer>
+          <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
+          <Vignette eskil={false} offset={0.1} darkness={1.1} />
+        </EffectComposer>
+        
+        <OrbitControls enableZoom={false} autoRotate />
+      </Canvas>
+    </div>
+  )
+}
