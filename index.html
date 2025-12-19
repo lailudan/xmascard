@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dreamy Xmas</title>
+    <title>Merry Christmas Mrs. Nagelberg</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #050103; overflow: hidden; }
         canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
-        .ui-layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 10; }
+        .ui-layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 10; text-align: center; }
     </style>
 </head>
 <body>
     <div class="ui-layer">
-        <h1 style="font-family: 'Playfair Display', serif;" class="text-4xl md:text-6xl text-pink-200 mb-2 drop-shadow-[0_0_20px_rgba(255,105,180,0.8)] text-center px-4">
+        <h1 style="font-family: 'Playfair Display', serif;" class="text-4xl md:text-6xl text-pink-200 mb-2 drop-shadow-[0_0_20px_rgba(255,105,180,0.8)] px-4">
             MERRY CHRISTMAS
         </h1>
         <h2 class="text-pink-100/80 text-lg md:text-xl mb-6 tracking-wide">To Mrs. Nagelberg</h2>
@@ -34,11 +34,10 @@
     <script type="module">
         import * as THREE from 'three';
 
-        let scene, camera, renderer, points;
+        let scene, camera, renderer, points, star;
         let mode = 'TREE'; 
-        const count = 8000;
+        const count = 12000; // Increased for a "fuller" look
         
-        // 存储位置数据
         const currentPos = new Float32Array(count * 3);
         const treePos = new Float32Array(count * 3);
         const explodePos = new Float32Array(count * 3);
@@ -50,42 +49,50 @@
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 25);
+            camera.position.set(0, 5, 30);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
 
-            // 核心算法：计算两种状态的坐标
+            // 1. Create the Top Star
+            const starGeom = new THREE.OctahedronGeometry(1.2, 0);
+            const starMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
+            star = new THREE.Mesh(starGeom, starMat);
+            scene.add(star);
+
+            // 2. Generate Tree and Explode Positions
             for (let i = 0; i < count; i++) {
                 const i3 = i * 3;
                 
-                // 1. 圣诞树形态 (圆锥分布)
+                // Tree Shape (Dense cone with random internal variation)
                 const t = Math.random();
-                const r = (1 - t) * 8;
-                const angle = t * Math.PI * 18;
+                const angle = Math.random() * Math.PI * 2;
+                // Exponential distribution makes it "thicker" at the bottom
+                const r = Math.pow(Math.random(), 0.6) * (1 - t) * 10; 
+                
                 treePos[i3] = Math.cos(angle) * r;
-                treePos[i3 + 1] = t * 22 - 11;
+                treePos[i3 + 1] = t * 24 - 11; // Tall tree
                 treePos[i3 + 2] = Math.sin(angle) * r;
 
-                // 2. 爆炸形态 (球体随机)
-                const radius = 10 + Math.random() * 20;
+                // Explode Shape (Stellar Nebula look)
+                const radius = 10 + Math.random() * 25;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.random() * Math.PI;
                 explodePos[i3] = radius * Math.sin(phi) * Math.cos(theta);
                 explodePos[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
                 explodePos[i3 + 2] = radius * Math.cos(phi);
 
-                // 初始位置
                 currentPos[i3] = treePos[i3];
                 currentPos[i3+1] = treePos[i3+1];
                 currentPos[i3+2] = treePos[i3+2];
 
-                // 颜色 (粉色到浅紫色)
+                // Pink & White dreamy color mix
+                const isWhite = Math.random() > 0.8;
                 colors[i3] = 1.0; 
-                colors[i3 + 1] = 0.4 + Math.random() * 0.4;
-                colors[i3 + 2] = 0.6 + Math.random() * 0.4;
+                colors[i3 + 1] = isWhite ? 1.0 : 0.4 + Math.random() * 0.3;
+                colors[i3 + 2] = isWhite ? 1.0 : 0.7 + Math.random() * 0.3;
             }
 
             const geometry = new THREE.BufferGeometry();
@@ -93,18 +100,16 @@
             geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
             const material = new THREE.PointsMaterial({
-                size: 0.15,
+                size: 0.12,
                 vertexColors: true,
                 transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending,
-                sizeAttenuation: true
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending
             });
 
             points = new THREE.Points(geometry, material);
             scene.add(points);
 
-            // 点击切换状态
             window.addEventListener('mousedown', () => {
                 mode = mode === 'TREE' ? 'EXPLODE' : 'TREE';
             });
@@ -122,13 +127,21 @@
             const positions = points.geometry.attributes.position.array;
             const target = mode === 'TREE' ? treePos : explodePos;
 
-            // 平滑动画核心逻辑 (Lerp)
             for (let i = 0; i < count * 3; i++) {
-                positions[i] += (target[i] - positions[i]) * 0.06;
+                positions[i] += (target[i] - positions[i]) * 0.05;
             }
             
             points.geometry.attributes.position.needsUpdate = true;
-            points.rotation.y += 0.005; // 缓慢自转
+            points.rotation.y += 0.003;
+
+            // Animate Star
+            if (mode === 'TREE') {
+                star.position.y = 13.5; // Top of the tree
+                star.scale.setScalar(1 + Math.sin(Date.now() * 0.005) * 0.2); // Pulse
+                star.visible = true;
+            } else {
+                star.visible = false;
+            }
 
             renderer.render(scene, camera);
         }
