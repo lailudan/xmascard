@@ -9,18 +9,37 @@
     <style>
         body { margin: 0; background: #050103; overflow: hidden; }
         canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
-        .ui-layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 10; text-align: center; }
+        /* 优化 UI 层，使用 flex 布局将提示文字推到底部 */
+        .ui-layer { 
+            position: absolute; 
+            inset: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: space-between; 
+            pointer-events: none; 
+            z-index: 50; 
+            padding: 60px 20px;
+        }
+        .text-glow {
+            text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.9);
+        }
     </style>
 </head>
 <body>
     <div class="ui-layer">
-        <h1 style="font-family: 'Playfair Display', serif;" class="text-4xl md:text-6xl text-pink-200 mb-2 drop-shadow-[0_0_20px_rgba(255,105,180,0.8)] px-4">
-            MERRY CHRISTMAS
-        </h1>
-        <h2 class="text-pink-100/80 text-lg md:text-xl mb-6 tracking-wide">To Mrs. Nagelberg</h2>
-        <p class="text-white/40 tracking-[0.3em] text-[10px] md:text-xs uppercase animate-pulse">
-            Click for Magic • From Dylan
-        </p>
+        <div class="text-center">
+            <h1 style="font-family: 'Playfair Display', serif;" class="text-4xl md:text-6xl text-pink-200 mb-2 drop-shadow-[0_0_15px_rgba(255,105,180,0.6)]">
+                MERRY CHRISTMAS
+            </h1>
+            <h2 class="text-pink-100/90 text-xl md:text-2xl tracking-wide text-glow">To Mrs. Nagelberg</h2>
+        </div>
+
+        <div class="text-center">
+            <p class="text-white/60 tracking-[0.4em] text-[12px] md:text-sm uppercase animate-pulse text-glow bg-black/20 px-4 py-1 rounded-full backdrop-blur-sm">
+                Click for Magic • From Dylan
+            </p>
+        </div>
     </div>
 
     <script type="importmap">
@@ -36,7 +55,7 @@
 
         let scene, camera, renderer, points, star;
         let mode = 'TREE'; 
-        const count = 12000; // Increased for a "fuller" look
+        const count = 12000; 
         
         const currentPos = new Float32Array(count * 3);
         const treePos = new Float32Array(count * 3);
@@ -49,35 +68,33 @@
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 30);
+            camera.position.set(0, 4, 32); // 稍微后移相机，给文字留空间
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.body.appendChild(renderer.domElement);
 
-            // 1. Create the Top Star
+            // 1. 顶部的金星
             const starGeom = new THREE.OctahedronGeometry(1.2, 0);
             const starMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
             star = new THREE.Mesh(starGeom, starMat);
             scene.add(star);
 
-            // 2. Generate Tree and Explode Positions
+            // 2. 粒子生成
             for (let i = 0; i < count; i++) {
                 const i3 = i * 3;
-                
-                // Tree Shape (Dense cone with random internal variation)
                 const t = Math.random();
                 const angle = Math.random() * Math.PI * 2;
-                // Exponential distribution makes it "thicker" at the bottom
-                const r = Math.pow(Math.random(), 0.6) * (1 - t) * 10; 
+                const r = Math.pow(Math.random(), 0.6) * (1 - t) * 11; 
                 
+                // 树形：向上微调一点位置
                 treePos[i3] = Math.cos(angle) * r;
-                treePos[i3 + 1] = t * 24 - 11; // Tall tree
+                treePos[i3 + 1] = t * 24 - 10; 
                 treePos[i3 + 2] = Math.sin(angle) * r;
 
-                // Explode Shape (Stellar Nebula look)
-                const radius = 10 + Math.random() * 25;
+                // 爆炸形态
+                const radius = 12 + Math.random() * 25;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.random() * Math.PI;
                 explodePos[i3] = radius * Math.sin(phi) * Math.cos(theta);
@@ -88,10 +105,10 @@
                 currentPos[i3+1] = treePos[i3+1];
                 currentPos[i3+2] = treePos[i3+2];
 
-                // Pink & White dreamy color mix
-                const isWhite = Math.random() > 0.8;
+                // 颜色混搭
+                const isWhite = Math.random() > 0.85;
                 colors[i3] = 1.0; 
-                colors[i3 + 1] = isWhite ? 1.0 : 0.4 + Math.random() * 0.3;
+                colors[i3 + 1] = isWhite ? 0.9 : 0.4 + Math.random() * 0.4;
                 colors[i3 + 2] = isWhite ? 1.0 : 0.7 + Math.random() * 0.3;
             }
 
@@ -100,7 +117,7 @@
             geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
             const material = new THREE.PointsMaterial({
-                size: 0.12,
+                size: 0.13,
                 vertexColors: true,
                 transparent: true,
                 opacity: 0.7,
@@ -128,16 +145,16 @@
             const target = mode === 'TREE' ? treePos : explodePos;
 
             for (let i = 0; i < count * 3; i++) {
-                positions[i] += (target[i] - positions[i]) * 0.05;
+                positions[i] += (target[i] - positions[i]) * 0.055;
             }
             
             points.geometry.attributes.position.needsUpdate = true;
             points.rotation.y += 0.003;
 
-            // Animate Star
             if (mode === 'TREE') {
-                star.position.y = 13.5; // Top of the tree
-                star.scale.setScalar(1 + Math.sin(Date.now() * 0.005) * 0.2); // Pulse
+                star.position.y = 14.2; 
+                star.rotation.y += 0.02;
+                star.scale.setScalar(1 + Math.sin(Date.now() * 0.004) * 0.15);
                 star.visible = true;
             } else {
                 star.visible = false;
